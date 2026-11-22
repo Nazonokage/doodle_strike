@@ -110,6 +110,32 @@ void main() {
       expect(sim.state.players.first.x, closeTo(1.4, 1e-9));
     });
 
+    test('jetpacking while pressing against the left wall stays within bounds', () {
+      final sim = _newSim();
+      // Move to left wall
+      _run(sim, 400, _in(moveX: -127));
+      expect(sim.state.players.first.x, closeTo(1.4, 1e-9));
+      // Jetpack up against the left wall
+      _run(sim, 60, _in(moveX: -127, buttons: InputCommand.btnJet));
+      final p = sim.state.players.first;
+      expect(p.x, closeTo(1.4, 1e-9));
+      expect(p.y < 5.2, isTrue);
+      expect(p.y >= 1.8 - 1e-9, isTrue);
+      expect(p.alive, isTrue);
+    });
+
+    test('an out of bounds player dies and initiates respawn', () {
+      final sim = _newSim();
+      final p = sim.state.players.first;
+      p.x = -5.0; // Force OOB
+      sim.step(<int, InputCommand>{1: _in()});
+      expect(p.alive, isFalse);
+      expect(p.health, equals(0));
+      expect(p.deaths, equals(1));
+      expect(p.respawnTimer, equals(180));
+      expect(sim.events.any((e) => e is PlayerDiedEvent && e.victimId == 1), isTrue);
+    });
+
     test('a missing input repeats the last known input', () {
       final sim = _newSim();
       sim.step(<int, InputCommand>{1: _in(moveX: 127)});

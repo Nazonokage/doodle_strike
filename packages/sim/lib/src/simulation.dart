@@ -107,6 +107,16 @@ class Simulation {
       _handleWeaponSelect(p, prev);
       _handlePlayerCombat(p, prev);
       _movePlayer(p);
+
+      // Out-of-bounds safety net: if a player escapes the map, trigger death and respawn.
+      if (p.x < 0 || p.x > map.width || p.y < 0 || p.y > map.height) {
+        p.health = 0;
+        p.alive = false;
+        p.shieldTicks = 0;
+        p.deaths += 1;
+        p.respawnTimer = 180;
+        events.add(PlayerDiedEvent(victimId: p.id, killerId: p.id, x: p.x, y: p.y));
+      }
     }
 
     // 2. Step active projectiles
@@ -344,9 +354,9 @@ class Simulation {
   void _resolveX(PlayerState p) {
     final hw = config.halfWidth;
     final hh = config.halfHeight;
-    final tx0 = (p.x - hw).floor();
+    final tx0 = (p.x - hw + _eps).floor();
     final tx1 = (p.x + hw - _eps).floor();
-    final ty0 = (p.y - hh).floor();
+    final ty0 = (p.y - hh + _eps).floor();
     final ty1 = (p.y + hh - _eps).floor();
     for (var ty = ty0; ty <= ty1; ty++) {
       for (var tx = tx0; tx <= tx1; tx++) {
@@ -365,9 +375,9 @@ class Simulation {
   void _resolveY(PlayerState p) {
     final hw = config.halfWidth;
     final hh = config.halfHeight;
-    final tx0 = (p.x - hw).floor();
+    final tx0 = (p.x - hw + _eps).floor();
     final tx1 = (p.x + hw - _eps).floor();
-    final ty0 = (p.y - hh).floor();
+    final ty0 = (p.y - hh + _eps).floor();
     final ty1 = (p.y + hh - _eps).floor();
     for (var ty = ty0; ty <= ty1; ty++) {
       for (var tx = tx0; tx <= tx1; tx++) {
