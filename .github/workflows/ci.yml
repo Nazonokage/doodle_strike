@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  sim-and-protocol:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - name: Sim purity (no banned imports or calls)
+        run: bash tools/check_sim_purity.sh
+      - name: Analyze packages
+        run: dart analyze packages/sim packages/protocol
+      - name: Test sim (VM)
+        working-directory: packages/sim
+        run: dart test
+      - name: Test protocol (VM)
+        working-directory: packages/protocol
+        run: dart test
+      # Same golden hash must hold when compiled to JavaScript.
+      - name: Test sim (web)
+        working-directory: packages/sim
+        run: dart test -p chrome
+
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter analyze

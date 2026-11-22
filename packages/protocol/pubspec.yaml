@@ -1,0 +1,14 @@
+name: protocol
+description: Network messages, codec, versioning and the Transport interface for Doodle Strike.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  sim:
+    path: ../sim
+
+dev_dependencies:
+  test: ^1.25.0

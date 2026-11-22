@@ -1,0 +1,15 @@
+.dart_tool/
+.packages
+build/
+pubspec.lock
+*.iml
+.idea/
+.vscode/
+.DS_Store
+# Flutter platform folders are generated: see README "Getting Started"
+app/android/
+app/ios/
+app/web/
+app/windows/
+app/macos/
+app/linux/

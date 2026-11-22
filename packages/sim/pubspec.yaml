@@ -1,0 +1,10 @@
+name: sim
+description: Deterministic, pure-Dart simulation for Doodle Strike. No Flutter, Flame, dart:io or dart:math.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.6.0
+
+dev_dependencies:
+  test: ^1.25.0

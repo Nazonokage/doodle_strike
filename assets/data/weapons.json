@@ -1,0 +1,58 @@
+[
+  {
+    "id": 1,
+    "name": "Rifle",
+    "damage": 16,
+    "fireIntervalTicks": 7,
+    "projectileSpeed": 0.72,
+    "lifetimeTicks": 75,
+    "spreadUnits": 220,
+    "magazine": 30,
+    "reloadTicks": 105,
+    "automatic": true,
+    "pellets": 1,
+    "projectileRadius": 0.12
+  },
+  {
+    "id": 2,
+    "name": "Pistol",
+    "damage": 34,
+    "fireIntervalTicks": 16,
+    "projectileSpeed": 0.85,
+    "lifetimeTicks": 70,
+    "spreadUnits": 0,
+    "magazine": 10,
+    "reloadTicks": 70,
+    "automatic": false,
+    "pellets": 1,
+    "projectileRadius": 0.12
+  },
+  {
+    "id": 3,
+    "name": "Shotgun",
+    "damage": 14,
+    "fireIntervalTicks": 42,
+    "projectileSpeed": 0.58,
+    "lifetimeTicks": 22,
+    "spreadUnits": 3200,
+    "magazine": 6,
+    "reloadTicks": 120,
+    "automatic": false,
+    "pellets": 5,
+    "projectileRadius": 0.1
+  },
+  {
+    "id": 4,
+    "name": "SMG",
+    "damage": 8,
+    "fireIntervalTicks": 4,
+    "projectileSpeed": 0.7,
+    "lifetimeTicks": 55,
+    "spreadUnits": 900,
+    "magazine": 32,
+    "reloadTicks": 95,
+    "automatic": true,
+    "pellets": 1,
+    "projectileRadius": 0.1
+  }
+]

@@ -1,0 +1,315 @@
+import 'package:sim/sim.dart';
+import 'package:test/test.dart';
+
+const List<String> _rows = <String>[
+  '####################',
+  '#..................#',
+  '#..................#',
+  '#..................#',
+  '#..................#',
+  '#S.................#',
+  '####################',
+];
+
+Simulation _newSim({int players = 1}) {
+  final sim = Simulation(map: TileMap.fromRows(_rows), seed: 1);
+  for (var i = 1; i <= players; i++) {
+    sim.addPlayer(i, x: 1.5 + i * 2, y: 5.2);
+  }
+  return sim;
+}
+
+InputCommand _in({int moveX = 0, int moveY = 0, int buttons = 0}) =>
+    InputCommand(tick: 0, moveX: moveX, moveY: moveY, buttons: buttons);
+
+void _run(Simulation sim, int ticks, InputCommand cmd, {int pid = 1}) {
+  for (var i = 0; i < ticks; i++) {
+    sim.step(<int, InputCommand>{pid: cmd});
+  }
+}
+
+/// Deterministic pseudo-input that exercises movement, jet and aim.
+InputCommand _scripted(int pid, int t) => InputCommand(
+      tick: t,
+      moveX: ((t * 7 + pid * 13) % 255) - 127,
+      moveY: ((t * 5 + pid * 3) % 255) - 127,
+      aim: (t * 331 + pid * 97) & 0xFFFF,
+      buttons: ((t + pid * 17) % 90 < 45) ? InputCommand.btnJet : 0,
+    );
+
+List<int> _scriptedRun(int ticks) {
+  final sim = _newSim(players: 3);
+  final hashes = <int>[];
+  for (var t = 0; t < ticks; t++) {
+    sim.step(<int, InputCommand>{
+      for (var pid = 1; pid <= 3; pid++) pid: _scripted(pid, t),
+    });
+    hashes.add(sim.hash());
+  }
+  return hashes;
+}
+
+void main() {
+  group('movement and physics', () {
+    test('a grounded player stays put under gravity', () {
+      final sim = _newSim();
+      _run(sim, 60, _in());
+      final p = sim.state.players.first;
+      expect(p.grounded, isTrue);
+      expect(p.y, closeTo(5.2, 1e-9));
+      expect(p.vy, equals(0.0));
+    });
+
+    test('an airborne player falls and lands', () {
+      final sim = Simulation(map: TileMap.fromRows(_rows));
+      sim.addPlayer(1, x: 5.5, y: 2.0);
+      _run(sim, 200, _in());
+      final p = sim.state.players.first;
+      expect(p.grounded, isTrue);
+      expect(p.y, closeTo(5.2, 1e-9));
+    });
+
+    test('the jetpack rises and drains fuel', () {
+      final sim = _newSim();
+      _run(sim, 30, _in(buttons: InputCommand.btnJet));
+      final p = sim.state.players.first;
+      expect(p.y < 5.2, isTrue);
+      expect(p.fuel, equals(150));
+      expect(p.grounded, isFalse);
+    });
+
+    test('pushing the stick up also fires the jetpack', () {
+      final sim = _newSim();
+      _run(sim, 30, _in(moveY: -127));
+      expect(sim.state.players.first.y < 5.2, isTrue);
+    });
+
+    test('fuel runs out, the player falls, lands and recharges', () {
+      final sim = _newSim();
+      _run(sim, 180, _in(buttons: InputCommand.btnJet));
+      expect(sim.state.players.first.fuel, equals(0));
+      _run(sim, 300, _in());
+      final p = sim.state.players.first;
+      expect(p.grounded, isTrue);
+      expect(p.fuel, equals(180));
+    });
+
+    test('the ceiling stops the jetpack', () {
+      final sim = _newSim();
+      _run(sim, 120, _in(buttons: InputCommand.btnJet));
+      final p = sim.state.players.first;
+      // Ceiling tile row 0 ends at y = 1, so the center cannot go above 1.8.
+      expect(p.y >= 1.8 - 1e-9, isTrue);
+    });
+
+    test('walls stop horizontal movement on both sides', () {
+      final sim = _newSim();
+      _run(sim, 300, _in(moveX: 127));
+      expect(sim.state.players.first.x, closeTo(18.6, 1e-9));
+      _run(sim, 400, _in(moveX: -127));
+      expect(sim.state.players.first.x, closeTo(1.4, 1e-9));
+    });
+
+    test('a missing input repeats the last known input', () {
+      final sim = _newSim();
+      sim.step(<int, InputCommand>{1: _in(moveX: 127)});
+      final x1 = sim.state.players.first.x;
+      sim.step(<int, InputCommand>{});
+      expect(sim.state.players.first.x > x1, isTrue);
+    });
+  });
+
+  group('players', () {
+    test('are kept sorted by id and ids are unique', () {
+      final sim = Simulation(map: TileMap.fromRows(_rows));
+      sim.addPlayer(3, x: 2, y: 5.2);
+      sim.addPlayer(1, x: 4, y: 5.2);
+      sim.addPlayer(2, x: 6, y: 5.2);
+      expect(sim.state.players.map((p) => p.id).toList(), equals(<int>[1, 2, 3]));
+      expect(() => sim.addPlayer(2, x: 8, y: 5.2), throwsArgumentError);
+    });
+
+    test('spawn points are used when no position is given', () {
+      final sim = Simulation(map: TileMap.fromRows(_rows));
+      final p = sim.addPlayer(1);
+      expect(p.x, equals(1.5));
+      expect(p.y, closeTo(5.2, 1e-12));
+    });
+  });
+
+  group('snapshot, restore and hash', () {
+    test('restore then replay gives the same hash as the original run', () {
+      final sim = _newSim(players: 2);
+      for (var t = 0; t < 40; t++) {
+        sim.step(<int, InputCommand>{1: _scripted(1, t), 2: _scripted(2, t)});
+      }
+      final snap = sim.snapshot();
+      final snapHash = sim.hash();
+
+      for (var t = 40; t < 80; t++) {
+        sim.step(<int, InputCommand>{1: _scripted(1, t), 2: _scripted(2, t)});
+      }
+      final firstRun = sim.hash();
+
+      sim.restore(snap);
+      expect(sim.hash(), equals(snapHash));
+      for (var t = 40; t < 80; t++) {
+        sim.step(<int, InputCommand>{1: _scripted(1, t), 2: _scripted(2, t)});
+      }
+      expect(sim.hash(), equals(firstRun));
+    });
+
+    test('a snapshot is independent of later steps', () {
+      final sim = _newSim();
+      final snap = sim.snapshot();
+      final before = snap.hash();
+      _run(sim, 20, _in(moveX: 127));
+      expect(snap.hash(), equals(before));
+    });
+
+    test('hash changes when state changes', () {
+      final sim = _newSim();
+      final h0 = sim.hash();
+      _run(sim, 1, _in(moveX: 127));
+      expect(sim.hash(), isNot(equals(h0)));
+    });
+  });
+
+  group('combat and shooting', () {
+    test('firing spawns projectiles and drains ammo', () {
+      final sim = _newSim(players: 1);
+      final p = sim.state.players.first;
+      expect(p.ammo, equals(sim.weapon.magazineSize));
+      expect(sim.state.projectiles, isEmpty);
+
+      // Fire to the right (aim 0)
+      sim.step(<int, InputCommand>{1: _in(buttons: InputCommand.btnFire)});
+      expect(p.ammo, equals(sim.weapon.magazineSize - 1));
+      expect(sim.state.projectiles.length, equals(1));
+      final pr = sim.state.projectiles.first;
+      expect(pr.shooterId, equals(1));
+      expect(pr.vx > 0, isTrue);
+      expect(sim.events.whereType<ShotFiredEvent>().length, equals(1));
+    });
+
+    test('projectiles hit enemy players and deal damage', () {
+      final sim = _newSim(players: 2);
+      final p2 = sim.state.players[1];
+      expect(p2.health, equals(100));
+      p2.shieldTicks = 0;
+
+      // Aim directly at p2 (aim 0 = right) and fire
+      sim.step(<int, InputCommand>{1: _in(buttons: InputCommand.btnFire)});
+      var hitEventFired = false;
+      for (var i = 0; i < 20; i++) {
+        sim.step(<int, InputCommand>{});
+        if (sim.events.any((e) => e is ProjectileHitEvent && e.hitPlayerId == 2)) {
+          hitEventFired = true;
+        }
+      }
+
+      expect(p2.health < 100, isTrue);
+      expect(hitEventFired, isTrue);
+    });
+
+    test('fatal damage causes death and initiates respawn timer', () {
+      final sim = _newSim(players: 2);
+      final p1 = sim.state.players[0];
+      final p2 = sim.state.players[1];
+      p2.health = 10; // 1 shot kill
+      p2.shieldTicks = 0;
+
+      sim.step(<int, InputCommand>{1: _in(buttons: InputCommand.btnFire)});
+      for (var i = 0; i < 20; i++) {
+        sim.step(<int, InputCommand>{});
+      }
+
+      expect(p2.alive, isFalse);
+      expect(p2.deaths, equals(1));
+      expect(p1.kills, equals(1));
+      expect(p2.respawnTimer > 0, isTrue);
+    });
+
+    test('spawn shield ignores damage until it expires', () {
+      final sim = _newSim(players: 2);
+      final p2 = sim.state.players[1];
+      expect(p2.shieldTicks, equals(40));
+      sim.step(<int, InputCommand>{1: _in(buttons: InputCommand.btnFire)});
+      for (var i = 0; i < 20; i++) {
+        sim.step(<int, InputCommand>{});
+      }
+      expect(p2.health, equals(100));
+      expect(p2.alive, isTrue);
+    });
+
+    test('a semi-auto weapon fires once per press', () {
+      final sim = Simulation(
+        map: TileMap.fromRows(_rows),
+        weapons: const <WeaponConfig>[
+          WeaponConfig(automatic: false, fireIntervalTicks: 5, magazineSize: 8),
+        ],
+      );
+      sim.addPlayer(1, x: 3, y: 5.2);
+      final p = sim.state.players.first;
+      final held = _in(buttons: InputCommand.btnFire);
+      for (var i = 0; i < 12; i++) {
+        sim.step(<int, InputCommand>{1: held});
+      }
+      expect(p.ammo, equals(7));
+      sim.step(<int, InputCommand>{1: _in()});
+      sim.step(<int, InputCommand>{1: held});
+      expect(p.ammo, equals(6));
+    });
+
+    test('swap cycles weapons and keeps each magazine', () {
+      final sim = Simulation(
+        map: TileMap.fromRows(_rows),
+        weapons: const <WeaponConfig>[
+          WeaponConfig(id: 1, magazineSize: 10),
+          WeaponConfig(id: 2, name: 'Pistol', magazineSize: 4, automatic: false),
+        ],
+      );
+      sim.addPlayer(1, x: 3, y: 5.2);
+      final p = sim.state.players.first;
+      sim.step(<int, InputCommand>{1: _in(buttons: InputCommand.btnFire)});
+      expect(p.ammo, equals(9));
+      sim.step(<int, InputCommand>{
+        1: _in(buttons: InputCommand.btnSwap),
+      });
+      expect(p.weaponIndex, equals(1));
+      expect(p.ammo, equals(4));
+      for (var i = 0; i < 8; i++) {
+        sim.step(<int, InputCommand>{1: _in()});
+      }
+      sim.step(<int, InputCommand>{1: _in(buttons: InputCommand.btnFire)});
+      expect(p.ammo, equals(3));
+      sim.step(<int, InputCommand>{
+        1: const InputCommand(tick: 0, weaponId: 1),
+      });
+      expect(p.weaponIndex, equals(0));
+      expect(p.ammo, equals(9));
+    });
+
+    test('bot controller computes aim and fires at enemy', () {
+      final sim = _newSim(players: 2);
+      const bot = BotController(botId: 2);
+      final botCmd = bot.computeInput(sim.state, sim.tick);
+      expect(botCmd.firing, isTrue);
+      expect(botCmd.aim, isNonZero);
+    });
+  });
+
+  group('determinism', () {
+    test('the same inputs give identical per-tick hashes', () {
+      expect(_scriptedRun(600), equals(_scriptedRun(600)));
+    });
+
+    test('golden hash of the scripted scenario', () {
+      // Weapon index, per-gun magazines, and spawn shield are now part of the
+      // hashed state. The scripted inputs still only jet and move, so the
+      // number changed because those fields are folded in, not because
+      // movement was retuned.
+      expect(_scriptedRun(600).last, equals(3458003174));
+    });
+  });
+}
