@@ -30,7 +30,7 @@ class Trig {
 
   /// Returns a 16-bit angle (0..65535) from (x1, y1) to (x2, y2).
   /// Uses binary search on kSinTable and Newton-Raphson square root to remain
-  /// pure and deterministic across all architectures without importing dart:math.
+  /// pure and deterministic across all architectures without the platform math library.
   static int angleBetween(double x1, double y1, double x2, double y2) {
     final dx = x2 - x1;
     final dy = y2 - y1;

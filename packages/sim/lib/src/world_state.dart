@@ -1,10 +1,19 @@
 import 'commands/input_command.dart';
+import 'entities/pickup_state.dart';
 import 'entities/projectile_state.dart';
 import 'math/rng.dart';
 
 /// One player's full simulation state. Mutable on purpose: the simulation
 /// steps it in place. Always copy before keeping a reference across ticks.
 class PlayerState {
+  /// Carried guns. Slot 0 is the first slot the player spawns with.
+  static const int slotCount = 2;
+
+  /// [loadout] entry that means the slot has no weapon.
+  static const int emptyWeapon = -1;
+  static const int maxGrenades = 3;
+  static const int maxShield = 100;
+
   PlayerState({
     required this.id,
     required this.x,
@@ -16,16 +25,22 @@ class PlayerState {
     this.alive = true,
     this.grounded = false,
     this.input = InputCommand.neutral,
-    int ammo = 30,
+    List<int>? loadout,
     List<int>? magAmmo,
-    this.weaponIndex = 0,
+    this.activeSlot = 0,
     this.shieldTicks = 0,
     this.fireCooldown = 0,
     this.reloadCooldown = 0,
     this.respawnTimer = 0,
     this.kills = 0,
     this.deaths = 0,
-  }) : magAmmo = magAmmo ?? <int>[ammo];
+    this.ignorePickupId = 0,
+    this.grenades = 1,
+    this.shield = 0,
+    this.meleeCooldown = 0,
+    this.knockbackX = 0,
+  })  : loadout = _fixedSlots(loadout, emptyWeapon),
+        magAmmo = _fixedSlots(magAmmo, 0);
 
   final int id;
 
@@ -42,19 +57,63 @@ class PlayerState {
   /// Last known input. Reused on ticks where no new input arrives.
   InputCommand input;
 
-  /// Rounds left in each weapon's magazine, indexed like the sim weapon list.
+  /// Catalog index in each carried slot. [emptyWeapon] means the slot is empty.
+  /// Always length [slotCount].
+  final List<int> loadout;
+
+  /// Rounds left in each carried slot, parallel to [loadout].
   final List<int> magAmmo;
 
-  /// Index into the sim weapon list.
-  int weaponIndex;
+  /// Which carried slot is in the player's hands. 0 or 1.
+  int activeSlot;
 
   /// Ticks of spawn protection remaining. Hits are ignored while this is > 0.
   int shieldTicks;
 
-  /// Rounds in the active magazine.
-  int get ammo => magAmmo[weaponIndex];
+  /// Pickup id this player will not auto-collect until they walk off it.
+  /// 0 means none. Stops a dropped gun from jumping straight back into the hand.
+  int ignorePickupId;
 
-  set ammo(int value) => magAmmo[weaponIndex] = value;
+  /// Carried thrown grenades. Shield energy is separate from spawn immunity.
+  int grenades;
+  int shield;
+  int meleeCooldown;
+  double knockbackX;
+
+  /// Catalog index of the gun in hand, or [emptyWeapon].
+  int get weaponIndex {
+    if (activeSlot < 0 || activeSlot >= loadout.length) return emptyWeapon;
+    return loadout[activeSlot];
+  }
+
+  bool occupies(int slot) =>
+      slot >= 0 && slot < loadout.length && loadout[slot] != emptyWeapon;
+
+  bool get hasEmptySlot {
+    for (final weapon in loadout) {
+      if (weapon == emptyWeapon) return true;
+    }
+    return false;
+  }
+
+  /// Rounds in the active magazine. Zero when the active slot is empty.
+  int get ammo => occupies(activeSlot) ? magAmmo[activeSlot] : 0;
+
+  set ammo(int value) {
+    if (activeSlot >= 0 && activeSlot < magAmmo.length) {
+      magAmmo[activeSlot] = value;
+    }
+  }
+
+  static List<int> _fixedSlots(List<int>? values, int fill) {
+    final list = List<int>.filled(slotCount, fill);
+    if (values == null) return list;
+    final n = values.length < slotCount ? values.length : slotCount;
+    for (var i = 0; i < n; i++) {
+      list[i] = values[i];
+    }
+    return list;
+  }
 
   /// Ticks until next shot can be fired.
   int fireCooldown;
@@ -79,9 +138,15 @@ class PlayerState {
         alive: alive,
         grounded: grounded,
         input: input,
+        loadout: List<int>.from(loadout),
         magAmmo: List<int>.from(magAmmo),
-        weaponIndex: weaponIndex,
+        activeSlot: activeSlot,
         shieldTicks: shieldTicks,
+        ignorePickupId: ignorePickupId,
+        grenades: grenades,
+        shield: shield,
+        meleeCooldown: meleeCooldown,
+        knockbackX: knockbackX,
         fireCooldown: fireCooldown,
         reloadCooldown: reloadCooldown,
         respawnTimer: respawnTimer,
@@ -97,14 +162,18 @@ class WorldState {
       : tick = 0,
         players = <PlayerState>[],
         projectiles = <ProjectileState>[],
+        pickups = <PickupState>[],
         nextProjectileId = 1,
+        nextPickupId = 1,
         rng = Rng(seed);
 
   WorldState._(
     this.tick,
     this.players,
     this.projectiles,
+    this.pickups,
     this.nextProjectileId,
+    this.nextPickupId,
     this.rng,
   );
 
@@ -115,16 +184,22 @@ class WorldState {
     required List<ProjectileState> projectiles,
     required int nextProjectileId,
     required int rngState,
+    List<PickupState> pickups = const <PickupState>[],
+    int nextPickupId = 1,
   }) {
     final sortedPlayers = List<PlayerState>.from(players)
       ..sort((a, b) => a.id.compareTo(b.id));
     final sortedShots = List<ProjectileState>.from(projectiles)
       ..sort((a, b) => a.id.compareTo(b.id));
+    final sortedPickups = List<PickupState>.from(pickups)
+      ..sort((a, b) => a.id.compareTo(b.id));
     return WorldState._(
       tick,
       sortedPlayers,
       sortedShots,
+      sortedPickups,
       nextProjectileId,
+      nextPickupId,
       Rng.fromState(rngState),
     );
   }
@@ -138,7 +213,11 @@ class WorldState {
   /// Active projectiles stepped by the sim, sorted by ascending id.
   final List<ProjectileState> projectiles;
 
+  /// Gun pickups, sorted by ascending id. Hidden ones still occupy a slot.
+  final List<PickupState> pickups;
+
   int nextProjectileId;
+  int nextPickupId;
 
   final Rng rng;
 
@@ -153,7 +232,9 @@ class WorldState {
         tick,
         <PlayerState>[for (final p in players) p.copy()],
         <ProjectileState>[for (final pr in projectiles) pr.copy()],
+        <PickupState>[for (final g in pickups) g.copy()],
         nextProjectileId,
+        nextPickupId,
         rng.copy(),
       );
 
@@ -170,6 +251,7 @@ class WorldState {
     h = _mix(h, tick);
     h = _mix(h, rng.state);
     h = _mix(h, nextProjectileId);
+    h = _mix(h, nextPickupId);
     h = _mix(h, players.length);
     for (final p in players) {
       h = _mix(h, p.id);
@@ -181,8 +263,14 @@ class WorldState {
       h = _mix(h, p.health);
       h = _mix(h, p.alive ? 1 : 0);
       h = _mix(h, p.grounded ? 1 : 0);
+      h = _mix(h, p.activeSlot);
       h = _mix(h, p.weaponIndex);
       h = _mix(h, p.shieldTicks);
+      h = _mix(h, p.ignorePickupId);
+      h = _mix(h, p.loadout.length);
+      for (final weapon in p.loadout) {
+        h = _mix(h, weapon);
+      }
       h = _mix(h, p.magAmmo.length);
       for (final rounds in p.magAmmo) {
         h = _mix(h, rounds);
@@ -192,12 +280,33 @@ class WorldState {
       h = _mix(h, p.respawnTimer);
       h = _mix(h, p.kills);
       h = _mix(h, p.deaths);
+      if (p.grenades != 1 ||
+          p.shield != 0 ||
+          p.meleeCooldown != 0 ||
+          p.knockbackX != 0) {
+        // Fold the added combat state only when it departs from its defaults,
+        // keeping older no-item replay goldens stable.
+        h = _mix(h, p.grenades);
+        h = _mix(h, p.shield);
+        h = _mix(h, p.meleeCooldown);
+        h = _mix(h, _q(p.knockbackX));
+      }
       h = _mix(h, p.input.tick);
       h = _mix(h, p.input.moveX);
       h = _mix(h, p.input.moveY);
       h = _mix(h, p.input.aim);
       h = _mix(h, p.input.buttons);
       h = _mix(h, p.input.weaponId);
+    }
+    h = _mix(h, pickups.length);
+    for (final g in pickups) {
+      h = _mix(h, g.id);
+      h = _mix(h, _q(g.x));
+      h = _mix(h, _q(g.y));
+      h = _mix(h, g.weaponIndex);
+      h = _mix(h, g.ammo);
+      h = _mix(h, g.respawnTicks);
+      if (g.kind != PickupKind.weapon) h = _mix(h, g.kind.index);
     }
     h = _mix(h, projectiles.length);
     for (final pr in projectiles) {
@@ -210,6 +319,11 @@ class WorldState {
       h = _mix(h, pr.damage);
       h = _mix(h, pr.lifetime);
       h = _mix(h, _q(pr.radius));
+      if (pr.kind == ProjectileKind.grenade) {
+        h = _mix(h, pr.kind.index);
+        h = _mix(h, pr.fuseTicks);
+        h = _mix(h, _q(pr.blastRadius));
+      }
     }
     return h;
   }

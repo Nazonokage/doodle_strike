@@ -1,7 +1,7 @@
 name: doodle_strike
 description: Doodle Strike - 2D Mini Militia-style multiplayer shooter built with Flutter & Flame.
 publish_to: none
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
   sdk: ^3.6.0
@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   flame: ^1.18.0
+  shared_preferences: ^2.5.3
   sim:
     path: packages/sim
   protocol:

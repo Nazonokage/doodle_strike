@@ -29,6 +29,7 @@ class GameInput {
   bool keyFire = false;
   bool keyReload = false;
   bool keySwap = false;
+  bool keyGrenade = false;
 
   /// Weapon id to apply for a single tick, then cleared. 0 means no change.
   int pendingWeaponId = 0;
@@ -50,6 +51,15 @@ class GameInput {
   double touchAimY = 0.0;
   bool touchFiring = false;
   bool touchReload = false;
+  bool touchSwap = false;
+  bool touchDrop = false;
+  bool touchGrenade = false;
+
+  /// Scales how far the move stick must travel before it reaches full speed.
+  double moveSensitivity = 1;
+
+  /// Sticks inside this fraction of the pad report as centered.
+  double stickDeadZone = 0.12;
 
   void handleKeyEvent(KeyEvent event) {
     final isDown = event is KeyDownEvent || event is KeyRepeatEvent;
@@ -84,23 +94,24 @@ class GameInput {
       case LogicalKeyboardKey.keyQ:
         if (event is KeyDownEvent) keySwap = true;
         break;
+      case LogicalKeyboardKey.keyG:
+        if (event is KeyDownEvent) touchDrop = true;
+        break;
+      case LogicalKeyboardKey.keyE:
+        if (event is KeyDownEvent) keyGrenade = true;
+        break;
       case LogicalKeyboardKey.digit1:
         if (event is KeyDownEvent) pendingWeaponId = 1;
         break;
       case LogicalKeyboardKey.digit2:
         if (event is KeyDownEvent) pendingWeaponId = 2;
         break;
-      case LogicalKeyboardKey.digit3:
-        if (event is KeyDownEvent) pendingWeaponId = 3;
-        break;
-      case LogicalKeyboardKey.digit4:
-        if (event is KeyDownEvent) pendingWeaponId = 4;
-        break;
     }
   }
 
   /// Updates mouse aim based on player screen position and cursor screen position.
-  void updateMouseAim(double playerScreenX, double playerScreenY, double cursorX, double cursorY) {
+  void updateMouseAim(double playerScreenX, double playerScreenY,
+      double cursorX, double cursorY) {
     final dx = cursorX - playerScreenX;
     final dy = cursorY - playerScreenY;
     aimAngleRad = math.atan2(dy, dx);
@@ -115,16 +126,18 @@ class GameInput {
     var moveX = 0;
     if (keyLeft) moveX -= 127;
     if (keyRight) moveX += 127;
-    if (touchMoveX.abs() > 0.05) {
-      moveX = (touchMoveX * 127).clamp(-127, 127).round();
+    final shapedMoveX = _shapeStick(touchMoveX);
+    if (shapedMoveX.abs() > 0) {
+      moveX = (shapedMoveX * 127).clamp(-127, 127).round();
     }
 
-    // 2. Calculate Move Y / Jetpack
+    // 2. Up input fires the jet. Down remains available as directional input.
     var moveY = 0;
     if (keyUp || keyJet) moveY -= 127;
     if (keyDown) moveY += 127;
-    if (touchMoveY.abs() > 0.05) {
-      moveY = (touchMoveY * 127).clamp(-127, 127).round();
+    final shapedMoveY = _shapeStick(touchMoveY);
+    if (shapedMoveY.abs() > 0) {
+      moveY = (shapedMoveY * 127).clamp(-127, 127).round();
     }
 
     // 3. Aim angle in 16-bit units (0..65535, 0 = right, 16384 = down, 32768 = left, 49152 = up)
@@ -151,8 +164,14 @@ class GameInput {
     if (keyReload || touchReload) {
       buttons |= InputCommand.btnReload;
     }
-    if (keySwap) {
+    if (keySwap || touchSwap) {
       buttons |= InputCommand.btnSwap;
+    }
+    if (touchDrop) {
+      buttons |= InputCommand.btnDrop;
+    }
+    if (keyGrenade || touchGrenade) {
+      buttons |= InputCommand.btnGrenade;
     }
 
     final weaponId = pendingWeaponId;
@@ -161,6 +180,10 @@ class GameInput {
     if (keyReload) keyReload = false;
     if (touchReload) touchReload = false;
     if (keySwap) keySwap = false;
+    if (touchSwap) touchSwap = false;
+    if (touchDrop) touchDrop = false;
+    if (keyGrenade) keyGrenade = false;
+    if (touchGrenade) touchGrenade = false;
     pendingWeaponId = 0;
 
     return InputCommand(
@@ -176,12 +199,27 @@ class GameInput {
   /// Held movement comes from the live key set, so a missed key-up cannot stick.
   void _syncHeldKeys() {
     final keys = HardwareKeyboard.instance.logicalKeysPressed;
-    keyLeft = keys.contains(LogicalKeyboardKey.keyA) || keys.contains(LogicalKeyboardKey.arrowLeft);
-    keyRight = keys.contains(LogicalKeyboardKey.keyD) || keys.contains(LogicalKeyboardKey.arrowRight);
-    keyUp = keys.contains(LogicalKeyboardKey.keyW) || keys.contains(LogicalKeyboardKey.arrowUp);
-    keyDown = keys.contains(LogicalKeyboardKey.keyS) || keys.contains(LogicalKeyboardKey.arrowDown);
+    keyLeft = keys.contains(LogicalKeyboardKey.keyA) ||
+        keys.contains(LogicalKeyboardKey.arrowLeft);
+    keyRight = keys.contains(LogicalKeyboardKey.keyD) ||
+        keys.contains(LogicalKeyboardKey.arrowRight);
+    keyUp = keys.contains(LogicalKeyboardKey.keyW) ||
+        keys.contains(LogicalKeyboardKey.arrowUp);
+    keyDown = keys.contains(LogicalKeyboardKey.keyS) ||
+        keys.contains(LogicalKeyboardKey.arrowDown);
     keyJet = keys.contains(LogicalKeyboardKey.space);
-    keyFire = keys.contains(LogicalKeyboardKey.keyF) || keys.contains(LogicalKeyboardKey.keyJ);
+    keyFire = keys.contains(LogicalKeyboardKey.keyF) ||
+        keys.contains(LogicalKeyboardKey.keyJ);
+  }
+
+  double _shapeStick(double value) {
+    final magnitude = value.abs();
+    if (magnitude <= stickDeadZone) return 0;
+    final span = 1 - stickDeadZone;
+    var scaled = span <= 0 ? 1.0 : (magnitude - stickDeadZone) / span;
+    scaled *= moveSensitivity;
+    if (scaled > 1) scaled = 1;
+    return value < 0 ? -scaled : scaled;
   }
 
   static int _radTo16(double rad) {

@@ -287,7 +287,23 @@ void main() {
       expect(p.ammo, equals(6));
     });
 
-    test('swap cycles weapons and keeps each magazine', () {
+    test('spawn loadout is a pistol in slot 1 and an empty slot 2', () {
+      final sim = Simulation(
+        map: TileMap.fromRows(_rows),
+        weapons: const <WeaponConfig>[
+          WeaponConfig(id: 1, name: 'Rifle', magazineSize: 10),
+          WeaponConfig(id: 2, name: 'Pistol', magazineSize: 4, automatic: false),
+        ],
+      );
+      sim.addPlayer(1, x: 3, y: 5.2);
+      final p = sim.state.players.single;
+      expect(p.loadout, equals(<int>[1, PlayerState.emptyWeapon]));
+      expect(p.activeSlot, equals(0));
+      expect(p.ammo, equals(4));
+      expect(p.magAmmo, equals(<int>[4, 0]));
+    });
+
+    test('switch toggles the two carried slots and keeps each magazine', () {
       final sim = Simulation(
         map: TileMap.fromRows(_rows),
         weapons: const <WeaponConfig>[
@@ -297,14 +313,21 @@ void main() {
       );
       sim.addPlayer(1, x: 3, y: 5.2);
       final p = sim.state.players.first;
+      p.loadout[0] = 0;
+      p.magAmmo[0] = 10;
+      p.loadout[1] = 1;
+      p.magAmmo[1] = 4;
+      p.activeSlot = 0;
       sim.step(<int, InputCommand>{1: _in(buttons: InputCommand.btnFire)});
       expect(p.ammo, equals(9));
+      sim.step(<int, InputCommand>{1: _in()});
       sim.step(<int, InputCommand>{
         1: _in(buttons: InputCommand.btnSwap),
       });
+      expect(p.activeSlot, equals(1));
       expect(p.weaponIndex, equals(1));
       expect(p.ammo, equals(4));
-      for (var i = 0; i < 8; i++) {
+      for (var i = 0; i < 10; i++) {
         sim.step(<int, InputCommand>{1: _in()});
       }
       sim.step(<int, InputCommand>{1: _in(buttons: InputCommand.btnFire)});
@@ -312,8 +335,165 @@ void main() {
       sim.step(<int, InputCommand>{
         1: const InputCommand(tick: 0, weaponId: 1),
       });
-      expect(p.weaponIndex, equals(0));
+      expect(p.activeSlot, equals(0));
       expect(p.ammo, equals(9));
+    });
+
+    test('an empty slot does not accept a switch', () {
+      final sim = _newSim();
+      final p = sim.state.players.single;
+      sim.step(<int, InputCommand>{1: _in(buttons: InputCommand.btnSwap)});
+      expect(p.activeSlot, equals(0));
+      expect(p.loadout[1], equals(PlayerState.emptyWeapon));
+    });
+
+    test('walking onto a gun fills the empty slot', () {
+      final sim = Simulation(
+        map: TileMap.fromRows(_rows),
+        weapons: const <WeaponConfig>[
+          WeaponConfig(id: 1, magazineSize: 10),
+          WeaponConfig(id: 2, name: 'Pistol', magazineSize: 4, automatic: false),
+        ],
+        seed: 7,
+      );
+      sim.addPlayer(1, x: 3, y: 5.2);
+      sim.spawnGunField(count: 1);
+      final gun = sim.state.pickups.single;
+      final p = sim.state.players.single;
+      p.x = gun.x;
+      p.y = gun.y;
+      final taken = gun.weaponIndex;
+      final rounds = gun.ammo;
+      sim.step(<int, InputCommand>{1: _in()});
+      expect(p.loadout[0], equals(1));
+      expect(p.loadout[1], equals(taken));
+      expect(p.activeSlot, equals(1));
+      expect(p.ammo, equals(rounds));
+      expect(gun.onGround, isFalse);
+      expect(sim.events.whereType<GunPickedUpEvent>().length, equals(1));
+    });
+
+    test('a full loadout stays full until the active gun is dropped onto the pickup', () {
+      final sim = Simulation(
+        map: TileMap.fromRows(_rows),
+        weapons: const <WeaponConfig>[
+          WeaponConfig(id: 1, name: 'Rifle', magazineSize: 10),
+          WeaponConfig(id: 2, name: 'Pistol', magazineSize: 4, automatic: false),
+        ],
+      );
+      sim.addPlayer(1, x: 3, y: 5.2);
+      final p = sim.state.players.single;
+      p.loadout[0] = 0;
+      p.magAmmo[0] = 9;
+      p.loadout[1] = 1;
+      p.magAmmo[1] = 2;
+      p.activeSlot = 1;
+      sim.state.pickups.add(
+        PickupState(id: 1, x: p.x, y: p.y, weaponIndex: 0, ammo: 10),
+      );
+      sim.state.nextPickupId = 2;
+      sim.step(<int, InputCommand>{1: _in()});
+      expect(p.loadout, equals(<int>[0, 1]));
+      expect(p.ammo, equals(2));
+      expect(sim.state.pickups.single.onGround, isTrue);
+
+      sim.step(<int, InputCommand>{1: _in(buttons: InputCommand.btnDrop)});
+      expect(p.loadout[1], equals(0));
+      expect(p.magAmmo[1], equals(10));
+      expect(p.loadout[0], equals(0));
+      expect(sim.state.pickups.single.weaponIndex, equals(1));
+      expect(sim.state.pickups.single.ammo, equals(2));
+      expect(sim.state.pickups.single.onGround, isTrue);
+    });
+
+    test('drop puts the active gun on the map and does not pick it straight back up', () {
+      final sim = _newSim();
+      final p = sim.state.players.single;
+      p.ammo = 11;
+      sim.step(<int, InputCommand>{1: _in(buttons: InputCommand.btnDrop)});
+      expect(p.loadout[0], equals(PlayerState.emptyWeapon));
+      expect(p.ammo, equals(0));
+      final gun = sim.state.pickups.single;
+      expect(gun.weaponIndex, equals(0));
+      expect(gun.ammo, equals(11));
+      expect(gun.onGround, isTrue);
+      sim.step(<int, InputCommand>{1: _in()});
+      expect(p.loadout[0], equals(PlayerState.emptyWeapon));
+      sim.step(<int, InputCommand>{1: _in(moveX: 127)});
+      for (var i = 0; i < 40; i++) {
+        sim.step(<int, InputCommand>{1: _in(moveX: 127)});
+      }
+      sim.step(<int, InputCommand>{1: _in()});
+      expect(p.ignorePickupId, equals(0));
+    });
+
+    test('reload refills the active magazine when its timer ends', () {
+      final sim = Simulation(
+        map: TileMap.fromRows(_rows),
+        weapons: const <WeaponConfig>[
+          WeaponConfig(id: 2, name: 'Pistol', magazineSize: 4, reloadTicks: 5, automatic: false),
+        ],
+      );
+      sim.addPlayer(1, x: 3, y: 5.2);
+      final p = sim.state.players.single;
+      p.ammo = 2;
+      sim.step(<int, InputCommand>{1: _in(buttons: InputCommand.btnReload)});
+      expect(p.reloadCooldown, equals(5));
+      expect(p.ammo, equals(2));
+      for (var i = 0; i < 4; i++) {
+        sim.step(<int, InputCommand>{1: _in()});
+        expect(p.ammo, equals(2));
+      }
+      sim.step(<int, InputCommand>{1: _in()});
+      expect(p.reloadCooldown, equals(0));
+      expect(p.ammo, equals(4));
+    });
+
+    test('respawn restores the starting pistol and clears the second slot', () {
+      final sim = Simulation(
+        map: TileMap.fromRows(_rows),
+        weapons: const <WeaponConfig>[
+          WeaponConfig(id: 1, name: 'Rifle', magazineSize: 10),
+          WeaponConfig(id: 2, name: 'Pistol', magazineSize: 4, automatic: false),
+        ],
+      );
+      sim.addPlayer(1, x: 3, y: 5.2);
+      final p = sim.state.players.single;
+      p.loadout[1] = 0;
+      p.magAmmo[1] = 3;
+      p.activeSlot = 1;
+      p.alive = false;
+      p.respawnTimer = 1;
+      sim.step(<int, InputCommand>{1: _in()});
+      expect(p.alive, isTrue);
+      expect(p.loadout, equals(<int>[1, PlayerState.emptyWeapon]));
+      expect(p.activeSlot, equals(0));
+      expect(p.ammo, equals(4));
+    });
+
+    test('a taken gun comes back, and the same seed replays the same hashes', () {
+      List<int> run() {
+        final sim = Simulation(map: TileMap.fromRows(_rows), seed: 3);
+        sim.addPlayer(1, x: 4, y: 5.2);
+        sim.spawnGunField(count: 2);
+        final gun = sim.state.pickups.first;
+        final p = sim.state.players.single;
+        p.x = gun.x;
+        p.y = gun.y;
+        sim.step(<int, InputCommand>{1: _in()});
+        expect(gun.respawnTicks, equals(Simulation.gunRespawnTicks - 1));
+        final hashes = <int>[sim.hash()];
+        // Stop on the tick it reappears, before a player can grab it again.
+        for (var i = 0; i < Simulation.gunRespawnTicks - 1; i++) {
+          sim.step(<int, InputCommand>{1: _in()});
+          hashes.add(sim.hash());
+        }
+        expect(gun.onGround, isTrue);
+        return hashes;
+      }
+
+      final first = run();
+      expect(run(), equals(first));
     });
 
     test('bot controller computes aim and fires at enemy', () {
@@ -331,11 +511,10 @@ void main() {
     });
 
     test('golden hash of the scripted scenario', () {
-      // Weapon index, per-gun magazines, and spawn shield are now part of the
-      // hashed state. The scripted inputs still only jet and move, so the
-      // number changed because those fields are folded in, not because
-      // movement was retuned.
-      expect(_scriptedRun(600).last, equals(3458003174));
+      // Movement is unchanged. The hash moved because each player now carries
+      // a two-slot loadout (starting gun plus an empty slot) and pickups hash
+      // their ammo, even when this run spawns none.
+      expect(_scriptedRun(600).last, equals(3453363565));
     });
   });
 }

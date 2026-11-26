@@ -8,9 +8,9 @@ A fast 2D dual-stick jetpack shooter inspired by Mini Militia. Local Wi-Fi multi
 
 | Part | State |
 |---|---|
-| `packages/sim` | 60 Hz tick, jetpack, combat, four data-driven weapons, spawn shield, state hash |
+| `packages/sim` | 60 Hz tick, jetpack, combat, four data-driven weapons, grenade and shield pickups, unarmed melee, spawn protection, state hash |
 | `packages/protocol` | Versioned packets, JSON codec, `Transport`, `InMemoryTransport`. Tests in the package |
-| `lib/` | Flame view, keyboard/mouse, dual sticks, HUD, kill feed. One bot via `InputCommand` |
+| `lib/` | Flame view, keyboard/mouse, dual sticks, HUD, kill feed. Bot match setup with difficulty and random pickup count |
 | Weapons | `assets/data/weapons.json` (rifle, pistol, shotgun, SMG) |
 | Phase 2 | Host/client, prediction, lobby: not started |
 

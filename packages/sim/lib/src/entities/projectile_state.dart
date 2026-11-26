@@ -1,3 +1,5 @@
+enum ProjectileKind { bullet, grenade }
+
 /// One projectile stepped deterministically by the simulation.
 class ProjectileState {
   ProjectileState({
@@ -10,6 +12,9 @@ class ProjectileState {
     required this.damage,
     required this.lifetime,
     required this.radius,
+    this.kind = ProjectileKind.bullet,
+    this.fuseTicks = 0,
+    this.blastRadius = 0,
   });
 
   final int id;
@@ -21,6 +26,9 @@ class ProjectileState {
   int damage;
   int lifetime;
   double radius;
+  final ProjectileKind kind;
+  int fuseTicks;
+  final double blastRadius;
 
   ProjectileState copy() => ProjectileState(
         id: id,
@@ -32,5 +40,8 @@ class ProjectileState {
         damage: damage,
         lifetime: lifetime,
         radius: radius,
+        kind: kind,
+        fuseTicks: fuseTicks,
+        blastRadius: blastRadius,
       );
 }

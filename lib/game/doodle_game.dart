@@ -19,19 +19,35 @@ class KillFeedLine {
 }
 
 class DoodleGame extends FlameGame {
-  DoodleGame({required this.input, required List<WeaponConfig> weapons})
-      : _sim = Simulation(
+  DoodleGame({
+    required this.input,
+    required List<WeaponConfig> weapons,
+    this.screenShake = true,
+    this.botDifficulty = BotDifficulty.standard,
+    this.randomGunCount = 5,
+    int seed = 1,
+  })  : _sim = Simulation(
           map: TileMap.fromRows(arenaMap),
           weapons: weapons,
-        ) {
-    // Add Player 1 (Local Human) and Player 2 (AI Bot)
+          seed: seed,
+        ),
+        _bot = BotController(botId: 2, difficulty: botDifficulty) {
+    vfx.screenShake = screenShake;
+    // Add Player 1 (Local Human) and Player 2 (AI Bot), then drop guns
+    // where neither of them is standing.
     _sim.addPlayer(1);
     _sim.addPlayer(2);
+    _sim.spawnGunField(count: randomGunCount);
+    _sim.spawnUtilityField();
   }
+
+  final bool screenShake;
+  final BotDifficulty botDifficulty;
+  final int randomGunCount;
 
   final GameInput input;
   final Simulation _sim;
-  final BotController _bot = const BotController(botId: 2);
+  final BotController _bot;
   final VfxManager vfx = VfxManager();
   final List<KillFeedLine> killFeed = <KillFeedLine>[];
 
@@ -139,7 +155,8 @@ class DoodleGame extends FlameGame {
       _processSimEvents();
       _accumulator -= _tickSeconds;
     }
-    _alpha = _previous == null ? 1 : (_accumulator / _tickSeconds).clamp(0.0, 1.0);
+    _alpha =
+        _previous == null ? 1 : (_accumulator / _tickSeconds).clamp(0.0, 1.0);
 
     final p1 = _sim.state.playerById(1);
     if (p1 != null && p1.alive && p1.input.wantsJet && p1.fuel > 0) {
@@ -180,13 +197,16 @@ class DoodleGame extends FlameGame {
 
     final halfVisibleTilesX = (size.x / tileSize) / 2;
     final halfVisibleTilesY = (size.y / tileSize) / 2;
-    cameraX = _clampCamera(cameraX, halfVisibleTilesX, _sim.map.width - halfVisibleTilesX, _sim.map.width / 2);
-    cameraY = _clampCamera(cameraY, halfVisibleTilesY, _sim.map.height - halfVisibleTilesY, _sim.map.height / 2);
+    cameraX = _clampCamera(cameraX, halfVisibleTilesX,
+        _sim.map.width - halfVisibleTilesX, _sim.map.width / 2);
+    cameraY = _clampCamera(cameraY, halfVisibleTilesY,
+        _sim.map.height - halfVisibleTilesY, _sim.map.height / 2);
   }
 
   /// Centers the view when the screen shows more of the map than exists,
   /// which happens in portrait where a naive clamp would throw.
-  static double _clampCamera(double value, double min, double max, double center) {
+  static double _clampCamera(
+      double value, double min, double max, double center) {
     if (min >= max) return center;
     if (value < min) return min;
     if (value > max) return max;
@@ -231,9 +251,6 @@ class DoodleGame extends FlameGame {
       switch (e) {
         case ShotFiredEvent():
           vfx.spawnMuzzleFlash(e.x, e.y, (e.aim / 65536.0) * 2 * math.pi);
-          if (e.shooterId == 1) {
-            vfx.addScreenShake(1.2);
-          }
         case ProjectileHitEvent():
           if (e.hitPlayerId != null) {
             vfx.spawnPlayerHitBlood(e.x, e.y, e.damage);
@@ -241,13 +258,21 @@ class DoodleGame extends FlameGame {
             vfx.spawnWallHitSparks(e.x, e.y);
           }
         case PlayerDiedEvent():
-          vfx.spawnDeathExplosion(e.x, e.y);
+          vfx.spawnDeathExplosion(e.x, e.y, shake: e.victimId == 1);
           final killer = e.killerId == 1 ? 'YOU' : 'BOT';
           final victim = e.victimId == 1 ? 'YOU' : 'BOT';
           killFeed.insert(0, KillFeedLine('$killer  >  $victim'));
           if (killFeed.length > 4) killFeed.removeLast();
         case PlayerRespawnedEvent():
           vfx.spawnWallHitSparks(e.x, e.y);
+        case GunPickedUpEvent():
+          vfx.spawnWallHitSparks(e.x, e.y);
+        case UtilityPickedUpEvent():
+          vfx.spawnWallHitSparks(e.x, e.y);
+        case MeleeHitEvent():
+          vfx.spawnPlayerHitBlood(e.x, e.y, e.damage);
+        case GrenadeExplodedEvent():
+          vfx.spawnGrenadeExplosion(e.x, e.y);
       }
     }
   }
@@ -263,11 +288,13 @@ class DoodleGame extends FlameGame {
 
     // Background fill
     canvas.drawRect(
-      Rect.fromCenter(center: Offset.zero, width: size.x * 2, height: size.y * 2),
+      Rect.fromCenter(
+          center: Offset.zero, width: size.x * 2, height: size.y * 2),
       _bgPaint,
     );
 
     _renderMap(canvas);
+    _renderPickups(canvas);
     _renderVfx(canvas);
 
     // Render Projectiles
@@ -349,7 +376,8 @@ class DoodleGame extends FlameGame {
       final packOffsetX = facingLeft ? 10.0 : -10.0;
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromCenter(center: Offset(px + packOffsetX, py), width: 8.0, height: 18.0),
+          Rect.fromCenter(
+              center: Offset(px + packOffsetX, py), width: 8.0, height: 18.0),
           const Radius.circular(3.0),
         ),
         Paint()..color = const Color(0xFF607D8B),
@@ -358,7 +386,8 @@ class DoodleGame extends FlameGame {
       // Body (Mini Militia Soldier torso)
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromCenter(center: Offset(px, py + 3), width: 18.0, height: 20.0),
+          Rect.fromCenter(
+              center: Offset(px, py + 3), width: 18.0, height: 20.0),
           const Radius.circular(6.0),
         ),
         bodyPaint,
@@ -372,6 +401,17 @@ class DoodleGame extends FlameGame {
             ..color = const Color(0x6600E5FF)
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2,
+        );
+      }
+      if (p.shield > 0) {
+        final shieldAlpha = 0.28 + 0.45 * (p.shield / PlayerState.maxShield);
+        canvas.drawCircle(
+          Offset(px, py),
+          25,
+          Paint()
+            ..color = const Color(0xFF80DEEA).withValues(alpha: shieldAlpha)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.5,
         );
       }
 
@@ -411,7 +451,8 @@ class DoodleGame extends FlameGame {
       );
 
       // Fuel bar
-      canvas.drawRect(Rect.fromLTWH(px - barW / 2, barY + barH + 1, barW, 2.5), _barBg);
+      canvas.drawRect(
+          Rect.fromLTWH(px - barW / 2, barY + barH + 1, barW, 2.5), _barBg);
       canvas.drawRect(
         Rect.fromLTWH(
           px - barW / 2,
@@ -439,11 +480,91 @@ class DoodleGame extends FlameGame {
     }
   }
 
+  void _renderPickups(Canvas canvas) {
+    const colors = <Color>[
+      Color(0xFF1E88E5),
+      Color(0xFFFFD54F),
+      Color(0xFFE53935),
+      Color(0xFF00E5FF),
+    ];
+    for (final gun in _sim.state.pickups) {
+      if (!gun.onGround) continue;
+      final bob = math.sin(_sim.tick / 10) * 3;
+      final px = (gun.x - cameraX) * tileSize;
+      final py = (gun.y - cameraY) * tileSize + bob;
+      final isWeapon = gun.kind == PickupKind.weapon;
+      if (isWeapon &&
+          (gun.weaponIndex < 0 || gun.weaponIndex >= _sim.weapons.length))
+        continue;
+      final color = switch (gun.kind) {
+        PickupKind.weapon => colors[gun.weaponIndex % colors.length],
+        PickupKind.grenade => const Color(0xFFFFA726),
+        PickupKind.shield => const Color(0xFF80DEEA),
+      };
+      if (isWeapon) {
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromCenter(center: Offset(px, py), width: 16, height: 8),
+            const Radius.circular(2),
+          ),
+          Paint()..color = color,
+        );
+        canvas.drawLine(
+          Offset(px + 6, py),
+          Offset(px + 16, py - 3),
+          Paint()
+            ..color = color
+            ..strokeWidth = 3
+            ..strokeCap = StrokeCap.round,
+        );
+      } else {
+        canvas.drawCircle(
+            Offset(px, py), 9, Paint()..color = color.withValues(alpha: 0.32));
+        canvas.drawCircle(
+          Offset(px, py),
+          5,
+          Paint()
+            ..color = color
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2,
+        );
+      }
+      final itemName = switch (gun.kind) {
+        PickupKind.weapon => _sim.weapons[gun.weaponIndex].name,
+        PickupKind.grenade => 'GRENADE',
+        PickupKind.shield => 'SHIELD',
+      };
+      final label = TextPainter(
+        text: TextSpan(
+          text: itemName,
+          style: TextStyle(
+              color: color, fontSize: 11, fontWeight: FontWeight.w800),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      label.paint(canvas, Offset(px - label.width / 2, py - 18));
+    }
+  }
+
   void _renderProjectiles(Canvas canvas) {
     for (final pr in _sim.state.projectiles) {
       final view = _viewShot(pr);
       final px = (view.x - cameraX) * tileSize;
       final py = (view.y - cameraY) * tileSize;
+
+      if (pr.kind == ProjectileKind.grenade) {
+        canvas.drawCircle(
+            Offset(px, py), 9, Paint()..color = const Color(0xFFFFA726));
+        canvas.drawCircle(
+          Offset(px, py),
+          10,
+          Paint()
+            ..color = const Color(0x99FFE082)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2,
+        );
+        continue;
+      }
 
       // Bullet trail
       canvas.drawLine(

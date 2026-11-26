@@ -38,6 +38,21 @@ void main() {
     expect(decoded.state.projectiles.single.radius, equals(sim.state.projectiles.single.radius));
   });
 
+  test('snapshot round trip keeps a gun pickup', () {
+    final sim = _sim();
+    sim.spawnGunField(count: 2);
+    final snap = WorldSnapshot(
+      header: const PacketHeader(seq: 1),
+      state: sim.snapshot(),
+      lastInputTick: const <int, int>{1: 0},
+    );
+    final decoded = decodeSnapshot(encodeSnapshot(snap));
+    expect(decoded.state.pickups.length, equals(2));
+    expect(decoded.state.pickups.first.weaponIndex, equals(sim.state.pickups.first.weaponIndex));
+    expect(decoded.state.nextPickupId, equals(sim.state.nextPickupId));
+    expect(decoded.state.hash(), equals(sim.hash()));
+  });
+
   test('six players and a handful of shots stay under 1.5 KB', () {
     final sim = Simulation(map: TileMap.fromRows(_rows), seed: 3);
     for (var id = 1; id <= 6; id++) {

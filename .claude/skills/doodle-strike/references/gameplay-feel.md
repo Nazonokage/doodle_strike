@@ -22,6 +22,9 @@ For each action define (in ticks): startup, active window, recovery, cooldown, r
 - Validate state before resolving: shooter alive, target alive, not already hit by this projectile, not in respawn invulnerability.
 - Avoid dominant spam: tune fire interval, spread, and ammo so no single weapon wins at every range.
 - Reload and weapon swap are vulnerable windows; make that cost visible in feedback.
+- Unarmed fire becomes a forward punch: 18 damage, 1.8-tile reach, and a 32-tick recovery. A grounded target gets a small push; an airborne target gets a stronger horizontal and upward impulse.
+- A grenade has a 90-tick fuse, bounces off solid tiles, and deals up to 72 damage within a 4.5-tile radius, with damage falling toward the edge.
+- Grenade pickups replenish a 3-grenade inventory. Shield pickups add 45 shield energy (100 cap); that energy absorbs incoming damage before health and remains separate from short spawn protection.
 
 Test deterministically: early/late timing boundaries, simultaneous kills, multiple targets in one shot, interrupted reload, fire on cooldown boundary tick, repeated inputs.
 

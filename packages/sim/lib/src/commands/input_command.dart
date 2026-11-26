@@ -25,7 +25,7 @@ class InputCommand {
   /// Bitmask of the `btn*` constants below.
   final int buttons;
 
-  /// Weapon id to switch to. 0 means keep the current weapon.
+  /// Carried slot to select, 1 or 2. 0 means keep the current slot.
   final int weaponId;
 
   static const int btnFire = 1;
@@ -33,6 +33,8 @@ class InputCommand {
   static const int btnMelee = 4;
   static const int btnSwap = 8;
   static const int btnReload = 16;
+  static const int btnDrop = 32;
+  static const int btnGrenade = 64;
 
   /// Stick pushed this far up (out of 127) also fires the jetpack.
   static const int jetStickThreshold = 40;

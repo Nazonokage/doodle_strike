@@ -87,7 +87,9 @@ Main menu, settings (sensitivity, audio, graphics), local stats, color/skin choi
 ### Phase 1 – Core Feel (offline, through the sim pipeline)
 **Status:** Complete. Playable offline combat prototype with bot, weapons, full HUD, particles, and multi-input controls running on 60 Hz deterministic sim.
 - Dual joysticks (touch) + Keyboard & Mouse (PC/web), jetpack flight, gravity, shooting, combat arena map, smooth follow camera, HUD, death and respawn
-- Deterministic AI bot (Player 2) operating through the standard `InputCommand` pipeline
+- Deterministic AI bot (Player 2) operating through the standard `InputCommand` pipeline, with Chill, Standard, and Sharp difficulty profiles
+- Pre-match setup for bot difficulty and 3/5/7 randomized arena weapon pickups
+- Grenades, shield-energy pickups, unarmed punches, and stronger punch knockback against airborne opponents
 - **Exit:** 30 sim tests green, determinism verified, full combat feel established.
 
 ### Phase 2 – Local Multiplayer Foundation

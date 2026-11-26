@@ -130,7 +130,11 @@ class PredictedClient {
         ady < _positionEpsilon &&
         predicted.health == server.health &&
         predicted.alive == server.alive &&
+        predicted.activeSlot == server.activeSlot &&
         predicted.weaponIndex == server.weaponIndex &&
-        predicted.ammo == server.ammo;
+        predicted.loadout[0] == server.loadout[0] &&
+        predicted.loadout[1] == server.loadout[1] &&
+        predicted.magAmmo[0] == server.magAmmo[0] &&
+        predicted.magAmmo[1] == server.magAmmo[1];
   }
 }

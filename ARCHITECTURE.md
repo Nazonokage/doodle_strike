@@ -154,6 +154,9 @@ If hash tests ever show drift anyway, switch hot paths to fixed-point. The state
 - Players are AABBs. Move axis by axis, resolve against tiles.
 - Jetpack: upward acceleration while held, fuel drains and recharges, capped velocity.
 - Projectiles: point or small AABB, stepped per tick, swept against tiles to avoid tunneling.
+- Grenades: seeded pickup positions, a 90-tick fuse, tile bounce, radial damage and knockback.
+- Unarmed fire punches in the aim direction; airborne targets receive stronger knockback.
+- Shield pickups add damage-absorbing shield energy, separate from spawn protection.
 - All constants (gravity, thrust, max speed) live in one `PhysicsConfig`.
 
 ### 4.5 Weapons (data-driven)

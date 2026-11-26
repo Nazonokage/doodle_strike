@@ -78,9 +78,15 @@ class VfxManager {
   final math.Random _rng = math.Random();
 
   double shakeMagnitude = 0.0;
+  double _shakePhase = 0.0;
+
+  /// View-only. The sim never reads this.
+  bool screenShake = true;
 
   void addScreenShake(double amount) {
-    shakeMagnitude = math.min(shakeMagnitude + amount, 15.0);
+    if (!screenShake) return;
+    if (shakeMagnitude <= 0) _shakePhase = 0;
+    shakeMagnitude = math.min(shakeMagnitude + amount, 5.0);
   }
 
   void spawnMuzzleFlash(double x, double y, double angle) {
@@ -96,7 +102,8 @@ class VfxManager {
         y: y,
         vx: math.cos(angle) * speed,
         vy: math.sin(angle) * speed,
-        color: _rng.nextBool() ? const Color(0xFFFFD54F) : const Color(0xFFFF7043),
+        color:
+            _rng.nextBool() ? const Color(0xFFFFD54F) : const Color(0xFFFF7043),
         size: 2.0 + _rng.nextDouble() * 2.5,
         maxLife: 0.2 + _rng.nextDouble() * 0.2,
       ));
@@ -104,7 +111,6 @@ class VfxManager {
   }
 
   void spawnPlayerHitBlood(double x, double y, int damage) {
-    addScreenShake(3.0);
     floatingTexts.add(FloatingText(
       text: '-$damage',
       x: x,
@@ -127,8 +133,8 @@ class VfxManager {
     }
   }
 
-  void spawnDeathExplosion(double x, double y) {
-    addScreenShake(8.0);
+  void spawnDeathExplosion(double x, double y, {required bool shake}) {
+    if (shake) addScreenShake(8.0);
     floatingTexts.add(FloatingText(
       text: 'KILLED!',
       x: x,
@@ -145,9 +151,27 @@ class VfxManager {
         y: y,
         vx: math.cos(angle) * speed,
         vy: math.sin(angle) * speed,
-        color: _rng.nextBool() ? const Color(0xFFFF9100) : const Color(0xFFFF1744),
+        color:
+            _rng.nextBool() ? const Color(0xFFFF9100) : const Color(0xFFFF1744),
         size: 3.0 + _rng.nextDouble() * 3.5,
         maxLife: 0.4 + _rng.nextDouble() * 0.4,
+      ));
+    }
+  }
+
+  void spawnGrenadeExplosion(double x, double y) {
+    for (var i = 0; i < 20; i++) {
+      final angle = _rng.nextDouble() * 2 * math.pi;
+      final speed = 3.0 + _rng.nextDouble() * 7.0;
+      particles.add(Particle(
+        x: x,
+        y: y,
+        vx: math.cos(angle) * speed,
+        vy: math.sin(angle) * speed,
+        color:
+            _rng.nextBool() ? const Color(0xFFFFA726) : const Color(0xFFFFE082),
+        size: 2.5 + _rng.nextDouble() * 3.0,
+        maxLife: 0.3 + _rng.nextDouble() * 0.3,
       ));
     }
   }
@@ -162,7 +186,8 @@ class VfxManager {
         y: y,
         vx: vx,
         vy: vy,
-        color: _rng.nextBool() ? const Color(0xFF00E5FF) : const Color(0xFFFFAB40),
+        color:
+            _rng.nextBool() ? const Color(0xFF00E5FF) : const Color(0xFFFFAB40),
         size: 2.0 + _rng.nextDouble() * 2.0,
         maxLife: 0.15 + _rng.nextDouble() * 0.15,
       ));
@@ -178,15 +203,17 @@ class VfxManager {
     muzzleFlashes.removeWhere((m) => !m.update(dt));
 
     if (shakeMagnitude > 0) {
-      shakeMagnitude -= 25.0 * dt;
+      shakeMagnitude -= 18.0 * dt;
+      _shakePhase += dt * math.pi * 2 * 7;
       if (shakeMagnitude < 0) shakeMagnitude = 0;
     }
   }
 
   ({double x, double y}) getShakeOffset() {
-    if (shakeMagnitude <= 0) return (x: 0.0, y: 0.0);
-    final ox = (_rng.nextDouble() - 0.5) * 2 * shakeMagnitude;
-    final oy = (_rng.nextDouble() - 0.5) * 2 * shakeMagnitude;
-    return (x: ox, y: oy);
+    if (!screenShake || shakeMagnitude <= 0) return (x: 0.0, y: 0.0);
+    return (
+      x: math.sin(_shakePhase) * shakeMagnitude,
+      y: math.sin(_shakePhase * 0.78 + 0.9) * shakeMagnitude * 0.55,
+    );
   }
 }

@@ -1,3 +1,5 @@
+import '../entities/pickup_state.dart';
+
 /// Pure sim events emitted during a step so views can trigger cosmetic
 /// feedback (audio, particles, muzzle flash, damage indicators).
 ///
@@ -46,6 +48,57 @@ class PlayerDiedEvent extends SimEvent {
   final int killerId;
   final double x;
   final double y;
+}
+
+class GunPickedUpEvent extends SimEvent {
+  const GunPickedUpEvent({
+    required this.playerId,
+    required this.weaponIndex,
+    required this.x,
+    required this.y,
+  });
+
+  final int playerId;
+  final int weaponIndex;
+  final double x;
+  final double y;
+}
+
+class UtilityPickedUpEvent extends SimEvent {
+  const UtilityPickedUpEvent(
+      {required this.playerId,
+      required this.kind,
+      required this.x,
+      required this.y});
+
+  final int playerId;
+  final PickupKind kind;
+  final double x;
+  final double y;
+}
+
+class MeleeHitEvent extends SimEvent {
+  const MeleeHitEvent(
+      {required this.playerId,
+      required this.targetId,
+      required this.x,
+      required this.y,
+      required this.damage});
+
+  final int playerId;
+  final int targetId;
+  final double x;
+  final double y;
+  final int damage;
+}
+
+class GrenadeExplodedEvent extends SimEvent {
+  const GrenadeExplodedEvent(
+      {required this.x, required this.y, required this.radius});
+
+  final double x;
+  final double y;
+  final double radius;
 }
 
 class PlayerRespawnedEvent extends SimEvent {
