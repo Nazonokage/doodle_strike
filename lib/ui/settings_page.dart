@@ -27,7 +27,7 @@ class SettingsPage extends StatelessWidget {
         child: Align(
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
+            constraints: const BoxConstraints(maxWidth: 900),
             child: ListView(
               padding: const EdgeInsets.fromLTRB(8, 8, 20, 28),
               children: [

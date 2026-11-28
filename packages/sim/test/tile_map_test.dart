@@ -16,7 +16,7 @@ void main() {
       expect(map.isSolid(1, 1), isFalse);
       expect(map.spawnPoints.length, equals(1));
       expect(map.spawnPoints.first.x, equals(1.5));
-      expect(map.spawnPoints.first.y, closeTo(1.2, 1e-12));
+      expect(map.spawnPoints.first.y, closeTo(1.3, 1e-12));
     });
 
     test('outside the grid is solid', () {

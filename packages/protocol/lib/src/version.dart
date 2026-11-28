@@ -17,7 +17,9 @@ const int protocolVersion = 6;
 ///    both slots are full, otherwise leaves the active gun on the map.
 ///    `weaponId` 1 and 2 select carried slots, not catalog ids.
 /// 4: grenades, energy shields, and unarmed melee are part of combat rules.
-const int rulesetVersion = 4;
+/// 5: shorter vertical player hitbox, landscape weapon tuning, and duplicate
+///    gun pickups add rounds to the carried weapon.
+const int rulesetVersion = 5;
 
 /// Fixed simulation rate. Locked decision D1.
 const int simTickRate = 60;

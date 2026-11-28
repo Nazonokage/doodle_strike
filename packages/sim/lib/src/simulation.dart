@@ -528,6 +528,27 @@ class Simulation {
         if (!_overlapsPickup(p, g)) continue;
         switch (g.kind) {
           case PickupKind.weapon:
+            if (g.weaponIndex < 0 || g.weaponIndex >= weapons.length) {
+              continue;
+            }
+            final matchingSlot = p.loadout.indexOf(g.weaponIndex);
+            if (matchingSlot >= 0) {
+              final weapon = weapons[g.weaponIndex];
+              final room = weapon.magazineSize - p.magAmmo[matchingSlot];
+              final added = g.ammo < room ? g.ammo : room;
+              if (added <= 0) continue;
+              p.magAmmo[matchingSlot] += added;
+              if (matchingSlot == p.activeSlot) p.reloadCooldown = 0;
+              g.respawnTicks = gunRespawnTicks;
+              events.add(AmmoPickedUpEvent(
+                playerId: p.id,
+                weaponIndex: g.weaponIndex,
+                roundsAdded: added,
+                x: g.x,
+                y: g.y,
+              ));
+              break;
+            }
             if (!p.hasEmptySlot) continue;
             _takeGun(p, g);
           case PickupKind.grenade:

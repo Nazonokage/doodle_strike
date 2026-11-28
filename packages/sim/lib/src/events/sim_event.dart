@@ -64,6 +64,22 @@ class GunPickedUpEvent extends SimEvent {
   final double y;
 }
 
+class AmmoPickedUpEvent extends SimEvent {
+  const AmmoPickedUpEvent({
+    required this.playerId,
+    required this.weaponIndex,
+    required this.roundsAdded,
+    required this.x,
+    required this.y,
+  });
+
+  final int playerId;
+  final int weaponIndex;
+  final int roundsAdded;
+  final double x;
+  final double y;
+}
+
 class UtilityPickedUpEvent extends SimEvent {
   const UtilityPickedUpEvent(
       {required this.playerId,

@@ -70,10 +70,12 @@ class DoodleGame extends FlameGame {
   final Paint _tileTopPaint = Paint()..color = const Color(0xFF4C506D);
 
   final Paint _p1BodyPaint = Paint()..color = const Color(0xFF1E88E5);
+  final Paint _p1LegPaint = Paint()..color = const Color(0xFF0D47A1);
   final Paint _headPaint = Paint()..color = const Color(0xFFFFCC80);
   final Paint _p1BandanaPaint = Paint()..color = const Color(0xFF0D47A1);
 
   final Paint _p2BodyPaint = Paint()..color = const Color(0xFFE53935);
+  final Paint _p2LegPaint = Paint()..color = const Color(0xFFB71C1C);
   final Paint _p2BandanaPaint = Paint()..color = const Color(0xFFB71C1C);
 
   final Paint _gunPaint = Paint()
@@ -104,7 +106,7 @@ class DoodleGame extends FlameGame {
     );
   }
 
-  static const List<String> arenaMap = <String>[
+  static const List<String> _baseArenaMap = <String>[
     '########################################',
     '#......................................#',
     '#..S................................S..#',
@@ -130,6 +132,13 @@ class DoodleGame extends FlameGame {
     '#........#####............#####........#',
     '########################################',
   ];
+
+  /// Adds four traversable tiles on each side for the landscape play area.
+  static final List<String> arenaMap = _baseArenaMap
+      .map((row) => row.contains('.') || row.contains('S')
+          ? '#....${row.substring(1, row.length - 1)}....#'
+          : '#' * 48)
+      .toList(growable: false);
 
   @override
   void update(double dt) {
@@ -267,6 +276,12 @@ class DoodleGame extends FlameGame {
           vfx.spawnWallHitSparks(e.x, e.y);
         case GunPickedUpEvent():
           vfx.spawnWallHitSparks(e.x, e.y);
+        case AmmoPickedUpEvent():
+          vfx.spawnWallHitSparks(e.x, e.y);
+          final weapon = _sim.weapons[e.weaponIndex];
+          killFeed.insert(
+              0, KillFeedLine('+${e.roundsAdded} ${weapon.name} AMMO'));
+          if (killFeed.length > 4) killFeed.removeLast();
         case UtilityPickedUpEvent():
           vfx.spawnWallHitSparks(e.x, e.y);
         case MeleeHitEvent():
@@ -359,6 +374,7 @@ class DoodleGame extends FlameGame {
 
       final isP1 = p.id == 1;
       final bodyPaint = isP1 ? _p1BodyPaint : _p2BodyPaint;
+      final legPaint = isP1 ? _p1LegPaint : _p2LegPaint;
       final bandanaPaint = isP1 ? _p1BandanaPaint : _p2BandanaPaint;
 
       // Laser Sight for local player
@@ -392,6 +408,15 @@ class DoodleGame extends FlameGame {
         ),
         bodyPaint,
       );
+
+      // Feet meet the simulation hitbox's bottom edge, so grounded soldiers
+      // no longer look like they are hovering above platform tops.
+      legPaint
+        ..strokeWidth = 5
+        ..strokeCap = StrokeCap.round;
+      final feetY = py + cfg.halfHeight * tileSize - 1;
+      canvas.drawLine(Offset(px - 3, py + 10), Offset(px - 5, feetY), legPaint);
+      canvas.drawLine(Offset(px + 3, py + 10), Offset(px + 5, feetY), legPaint);
 
       if (p.shieldTicks > 0) {
         canvas.drawCircle(

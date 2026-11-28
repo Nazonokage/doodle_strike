@@ -13,6 +13,10 @@ import 'ui/settings_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SystemChrome.setPreferredOrientations(const <DeviceOrientation>[
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+  ]);
   final raw = await rootBundle.loadString('assets/data/weapons.json');
   final weapons = WeaponCatalog.parse(raw);
   runApp(DoodleStrikeApp(weapons: weapons));
@@ -85,7 +89,11 @@ class _DoodleStrikeAppState extends State<DoodleStrikeApp> {
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF161622),
       ),
-      home: Scaffold(body: _body()),
+      home: OrientationBuilder(
+        builder: (context, orientation) => orientation == Orientation.portrait
+            ? const _LandscapeRequired()
+            : Scaffold(body: _body()),
+      ),
     );
   }
 
@@ -178,5 +186,42 @@ class _DoodleStrikeAppState extends State<DoodleStrikeApp> {
       input.updateMouseAim(size.width / 2, size.height / 2, cursorPosition.dx,
           cursorPosition.dy);
     }
+  }
+}
+
+class _LandscapeRequired extends StatelessWidget {
+  const _LandscapeRequired();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: Color(0xFF161622),
+      child: Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.screen_rotation, color: Color(0xFF64B5F6), size: 52),
+              SizedBox(height: 16),
+              Text(
+                'Rotate to landscape',
+                style: TextStyle(
+                  color: Color(0xFFF3EDE2),
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Doodle Strike is built for wide-screen play.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF9AA0B5), fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

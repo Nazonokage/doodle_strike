@@ -56,7 +56,7 @@ void main() {
       _run(sim, 60, _in());
       final p = sim.state.players.first;
       expect(p.grounded, isTrue);
-      expect(p.y, closeTo(5.2, 1e-9));
+      expect(p.y, closeTo(5.3, 1e-9));
       expect(p.vy, equals(0.0));
     });
 
@@ -66,7 +66,7 @@ void main() {
       _run(sim, 200, _in());
       final p = sim.state.players.first;
       expect(p.grounded, isTrue);
-      expect(p.y, closeTo(5.2, 1e-9));
+      expect(p.y, closeTo(5.3, 1e-9));
     });
 
     test('the jetpack rises and drains fuel', () {
@@ -98,8 +98,8 @@ void main() {
       final sim = _newSim();
       _run(sim, 120, _in(buttons: InputCommand.btnJet));
       final p = sim.state.players.first;
-      // Ceiling tile row 0 ends at y = 1, so the center cannot go above 1.8.
-      expect(p.y >= 1.8 - 1e-9, isTrue);
+      // Ceiling tile row 0 ends at y = 1, so the center cannot go above 1.7.
+      expect(p.y >= 1.7 - 1e-9, isTrue);
     });
 
     test('walls stop horizontal movement on both sides', () {
@@ -110,7 +110,8 @@ void main() {
       expect(sim.state.players.first.x, closeTo(1.4, 1e-9));
     });
 
-    test('jetpacking while pressing against the left wall stays within bounds', () {
+    test('jetpacking while pressing against the left wall stays within bounds',
+        () {
       final sim = _newSim();
       // Move to left wall
       _run(sim, 400, _in(moveX: -127));
@@ -120,7 +121,7 @@ void main() {
       final p = sim.state.players.first;
       expect(p.x, closeTo(1.4, 1e-9));
       expect(p.y < 5.2, isTrue);
-      expect(p.y >= 1.8 - 1e-9, isTrue);
+      expect(p.y >= 1.7 - 1e-9, isTrue);
       expect(p.alive, isTrue);
     });
 
@@ -133,7 +134,8 @@ void main() {
       expect(p.health, equals(0));
       expect(p.deaths, equals(1));
       expect(p.respawnTimer, equals(180));
-      expect(sim.events.any((e) => e is PlayerDiedEvent && e.victimId == 1), isTrue);
+      expect(sim.events.any((e) => e is PlayerDiedEvent && e.victimId == 1),
+          isTrue);
     });
 
     test('a missing input repeats the last known input', () {
@@ -151,7 +153,8 @@ void main() {
       sim.addPlayer(3, x: 2, y: 5.2);
       sim.addPlayer(1, x: 4, y: 5.2);
       sim.addPlayer(2, x: 6, y: 5.2);
-      expect(sim.state.players.map((p) => p.id).toList(), equals(<int>[1, 2, 3]));
+      expect(
+          sim.state.players.map((p) => p.id).toList(), equals(<int>[1, 2, 3]));
       expect(() => sim.addPlayer(2, x: 8, y: 5.2), throwsArgumentError);
     });
 
@@ -159,7 +162,7 @@ void main() {
       final sim = Simulation(map: TileMap.fromRows(_rows));
       final p = sim.addPlayer(1);
       expect(p.x, equals(1.5));
-      expect(p.y, closeTo(5.2, 1e-12));
+      expect(p.y, closeTo(5.3, 1e-12));
     });
   });
 
@@ -229,7 +232,8 @@ void main() {
       var hitEventFired = false;
       for (var i = 0; i < 20; i++) {
         sim.step(<int, InputCommand>{});
-        if (sim.events.any((e) => e is ProjectileHitEvent && e.hitPlayerId == 2)) {
+        if (sim.events
+            .any((e) => e is ProjectileHitEvent && e.hitPlayerId == 2)) {
           hitEventFired = true;
         }
       }
@@ -292,7 +296,8 @@ void main() {
         map: TileMap.fromRows(_rows),
         weapons: const <WeaponConfig>[
           WeaponConfig(id: 1, name: 'Rifle', magazineSize: 10),
-          WeaponConfig(id: 2, name: 'Pistol', magazineSize: 4, automatic: false),
+          WeaponConfig(
+              id: 2, name: 'Pistol', magazineSize: 4, automatic: false),
         ],
       );
       sim.addPlayer(1, x: 3, y: 5.2);
@@ -308,7 +313,8 @@ void main() {
         map: TileMap.fromRows(_rows),
         weapons: const <WeaponConfig>[
           WeaponConfig(id: 1, magazineSize: 10),
-          WeaponConfig(id: 2, name: 'Pistol', magazineSize: 4, automatic: false),
+          WeaponConfig(
+              id: 2, name: 'Pistol', magazineSize: 4, automatic: false),
         ],
       );
       sim.addPlayer(1, x: 3, y: 5.2);
@@ -352,7 +358,8 @@ void main() {
         map: TileMap.fromRows(_rows),
         weapons: const <WeaponConfig>[
           WeaponConfig(id: 1, magazineSize: 10),
-          WeaponConfig(id: 2, name: 'Pistol', magazineSize: 4, automatic: false),
+          WeaponConfig(
+              id: 2, name: 'Pistol', magazineSize: 4, automatic: false),
         ],
         seed: 7,
       );
@@ -373,12 +380,87 @@ void main() {
       expect(sim.events.whereType<GunPickedUpEvent>().length, equals(1));
     });
 
-    test('a full loadout stays full until the active gun is dropped onto the pickup', () {
+    test('a duplicate gun pickup adds ammo to the matching magazine', () {
       final sim = Simulation(
         map: TileMap.fromRows(_rows),
         weapons: const <WeaponConfig>[
           WeaponConfig(id: 1, name: 'Rifle', magazineSize: 10),
-          WeaponConfig(id: 2, name: 'Pistol', magazineSize: 4, automatic: false),
+          WeaponConfig(id: 2, name: 'Pistol', magazineSize: 12),
+        ],
+      );
+      sim.addPlayer(1, x: 3, y: 5.2);
+      final player = sim.state.players.single;
+      player.ammo = 5;
+      final pickup = PickupState(
+        id: 1,
+        x: player.x,
+        y: player.y,
+        weaponIndex: 1,
+        ammo: 6,
+      );
+      sim.state.pickups.add(pickup);
+
+      sim.step(<int, InputCommand>{1: _in()});
+
+      expect(player.loadout, equals(<int>[1, PlayerState.emptyWeapon]));
+      expect(player.ammo, equals(11));
+      expect(pickup.respawnTicks, equals(Simulation.gunRespawnTicks - 1));
+      final event = sim.events.whereType<AmmoPickedUpEvent>().single;
+      expect(event.weaponIndex, equals(1));
+      expect(event.roundsAdded, equals(6));
+    });
+
+    test('duplicate gun ammo is capped and a full magazine leaves the pickup',
+        () {
+      final sim = Simulation(
+        map: TileMap.fromRows(_rows),
+        weapons: const <WeaponConfig>[
+          WeaponConfig(id: 1, name: 'Rifle', magazineSize: 10),
+          WeaponConfig(id: 2, name: 'Pistol', magazineSize: 12),
+        ],
+      );
+      sim.addPlayer(1, x: 3, y: 5.2);
+      final player = sim.state.players.single;
+      player.ammo = 10;
+      final pickup = PickupState(
+        id: 1,
+        x: player.x,
+        y: player.y,
+        weaponIndex: 1,
+        ammo: 6,
+      );
+      sim.state.pickups.add(pickup);
+
+      sim.step(<int, InputCommand>{1: _in()});
+
+      expect(player.loadout, equals(<int>[1, PlayerState.emptyWeapon]));
+      expect(player.ammo, equals(12));
+      expect(pickup.onGround, isFalse);
+      expect(sim.events.whereType<AmmoPickedUpEvent>().single.roundsAdded, 2);
+
+      final fullPickup = PickupState(
+        id: 2,
+        x: player.x,
+        y: player.y,
+        weaponIndex: 1,
+        ammo: 6,
+      );
+      sim.state.pickups.add(fullPickup);
+      sim.step(<int, InputCommand>{1: _in()});
+      expect(fullPickup.onGround, isTrue);
+      expect(player.loadout, equals(<int>[1, PlayerState.emptyWeapon]));
+    });
+
+    test(
+        'a full loadout stays full until the active gun is dropped onto the pickup',
+        () {
+      final sim = Simulation(
+        map: TileMap.fromRows(_rows),
+        weapons: const <WeaponConfig>[
+          WeaponConfig(id: 1, name: 'Rifle', magazineSize: 10),
+          WeaponConfig(
+              id: 2, name: 'Pistol', magazineSize: 4, automatic: false),
+          WeaponConfig(id: 3, name: 'Shotgun', magazineSize: 6),
         ],
       );
       sim.addPlayer(1, x: 3, y: 5.2);
@@ -389,7 +471,7 @@ void main() {
       p.magAmmo[1] = 2;
       p.activeSlot = 1;
       sim.state.pickups.add(
-        PickupState(id: 1, x: p.x, y: p.y, weaponIndex: 0, ammo: 10),
+        PickupState(id: 1, x: p.x, y: p.y, weaponIndex: 2, ammo: 6),
       );
       sim.state.nextPickupId = 2;
       sim.step(<int, InputCommand>{1: _in()});
@@ -398,15 +480,17 @@ void main() {
       expect(sim.state.pickups.single.onGround, isTrue);
 
       sim.step(<int, InputCommand>{1: _in(buttons: InputCommand.btnDrop)});
-      expect(p.loadout[1], equals(0));
-      expect(p.magAmmo[1], equals(10));
+      expect(p.loadout[1], equals(2));
+      expect(p.magAmmo[1], equals(6));
       expect(p.loadout[0], equals(0));
       expect(sim.state.pickups.single.weaponIndex, equals(1));
       expect(sim.state.pickups.single.ammo, equals(2));
       expect(sim.state.pickups.single.onGround, isTrue);
     });
 
-    test('drop puts the active gun on the map and does not pick it straight back up', () {
+    test(
+        'drop puts the active gun on the map and does not pick it straight back up',
+        () {
       final sim = _newSim();
       final p = sim.state.players.single;
       p.ammo = 11;
@@ -431,7 +515,12 @@ void main() {
       final sim = Simulation(
         map: TileMap.fromRows(_rows),
         weapons: const <WeaponConfig>[
-          WeaponConfig(id: 2, name: 'Pistol', magazineSize: 4, reloadTicks: 5, automatic: false),
+          WeaponConfig(
+              id: 2,
+              name: 'Pistol',
+              magazineSize: 4,
+              reloadTicks: 5,
+              automatic: false),
         ],
       );
       sim.addPlayer(1, x: 3, y: 5.2);
@@ -454,7 +543,8 @@ void main() {
         map: TileMap.fromRows(_rows),
         weapons: const <WeaponConfig>[
           WeaponConfig(id: 1, name: 'Rifle', magazineSize: 10),
-          WeaponConfig(id: 2, name: 'Pistol', magazineSize: 4, automatic: false),
+          WeaponConfig(
+              id: 2, name: 'Pistol', magazineSize: 4, automatic: false),
         ],
       );
       sim.addPlayer(1, x: 3, y: 5.2);
@@ -471,13 +561,28 @@ void main() {
       expect(p.ammo, equals(4));
     });
 
-    test('a taken gun comes back, and the same seed replays the same hashes', () {
+    test('a taken gun comes back, and the same seed replays the same hashes',
+        () {
       List<int> run() {
-        final sim = Simulation(map: TileMap.fromRows(_rows), seed: 3);
+        final sim = Simulation(
+          map: TileMap.fromRows(_rows),
+          weapons: const <WeaponConfig>[
+            WeaponConfig(id: 1, name: 'Rifle'),
+            WeaponConfig(id: 2, name: 'Pistol'),
+            WeaponConfig(id: 3, name: 'Shotgun'),
+          ],
+          seed: 3,
+        );
         sim.addPlayer(1, x: 4, y: 5.2);
-        sim.spawnGunField(count: 2);
-        final gun = sim.state.pickups.first;
         final p = sim.state.players.single;
+        final gun = PickupState(
+          id: 1,
+          x: p.x,
+          y: p.y,
+          weaponIndex: 2,
+          ammo: sim.weapons[2].magazineSize,
+        );
+        sim.state.pickups.add(gun);
         p.x = gun.x;
         p.y = gun.y;
         sim.step(<int, InputCommand>{1: _in()});
@@ -511,10 +616,8 @@ void main() {
     });
 
     test('golden hash of the scripted scenario', () {
-      // Movement is unchanged. The hash moved because each player now carries
-      // a two-slot loadout (starting gun plus an empty slot) and pickups hash
-      // their ammo, even when this run spawns none.
-      expect(_scriptedRun(600).last, equals(3453363565));
+      // The hash moved because the vertical player hitbox is shorter.
+      expect(_scriptedRun(600).last, equals(3507419137));
     });
   });
 }

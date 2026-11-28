@@ -11,6 +11,7 @@ void main() {
     expect(weapons[1].automatic, isFalse);
     expect(weapons[2].pellets, 5);
     expect(weapons[3].automatic, isTrue);
+    expect(weapons.map((weapon) => weapon.magazineSize), [24, 12, 8, 36]);
   });
 
   test('unknown fields are rejected', () {

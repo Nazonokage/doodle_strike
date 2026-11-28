@@ -3,14 +3,19 @@
 ///
 /// Anything outside the grid counts as solid so players cannot leave the map.
 class TileMap {
-  TileMap({required this.width, required this.height, required List<int> tiles, List<({double x, double y})>? spawnPoints})
+  TileMap(
+      {required this.width,
+      required this.height,
+      required List<int> tiles,
+      List<({double x, double y})>? spawnPoints})
       : assert(tiles.length == width * height),
         _tiles = List<int>.unmodifiable(tiles),
-        spawnPoints = List<({double x, double y})>.unmodifiable(spawnPoints ?? const <({double x, double y})>[]);
+        spawnPoints = List<({double x, double y})>.unmodifiable(
+            spawnPoints ?? const <({double x, double y})>[]);
 
   /// Build from text rows. `#` is solid, `S` is a spawn (empty tile), anything
   /// else is empty. All rows must have equal length.
-  factory TileMap.fromRows(List<String> rows, {double halfHeight = 0.8}) {
+  factory TileMap.fromRows(List<String> rows, {double halfHeight = 0.7}) {
     assert(rows.isNotEmpty);
     final w = rows.first.length;
     final tiles = <int>[];
@@ -27,7 +32,8 @@ class TileMap {
         }
       }
     }
-    return TileMap(width: w, height: rows.length, tiles: tiles, spawnPoints: spawns);
+    return TileMap(
+        width: w, height: rows.length, tiles: tiles, spawnPoints: spawns);
   }
 
   final int width;

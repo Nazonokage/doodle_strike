@@ -12,7 +12,7 @@ class PhysicsConfig {
     this.maxFall = 0.416667, // 25 u/s
     this.runSpeed = 0.133333, // 8 u/s at full stick
     this.halfWidth = 0.4,
-    this.halfHeight = 0.8,
+    this.halfHeight = 0.7,
     this.fuelMax = 180, // 3 s of continuous thrust
     this.fuelDrain = 1, // per tick while jetting
     this.fuelRecharge = 2, // per tick while grounded and not jetting
